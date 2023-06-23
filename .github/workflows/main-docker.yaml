@@ -5,7 +5,7 @@ on:
     paths-ignore:
       - "**.md"
     branches:
-      - 'main'
+      - 'feat/github-docker-workflows'
 
 env:
   REGISTRY: ghcr.io
