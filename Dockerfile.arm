@@ -1,0 +1,45 @@
+####################################################################################################
+## Builder
+####################################################################################################
+FROM rust:alpine AS builder
+
+RUN apk add --no-cache g++ git
+
+WORKDIR /usr/src/tafkars
+
+# cache dependencies in their own layer
+COPY Cargo.lock Cargo.toml ./
+RUN mkdir src && echo "fn main() {}" > src/main.rs && cargo install --config net.git-fetch-with-cli=true --path . && rm -rf ./src
+
+COPY . .
+
+# net.git-fetch-with-cli is specified in order to prevent a potential OOM kill
+# in low memory environments. See:
+#     https://users.rust-lang.org/t/cargo-uses-too-much-memory-being-run-in-qemu/76531
+# This is tracked under issue #641. This also requires us to install git in the
+# builder.
+RUN cargo install --config net.git-fetch-with-cli=true --path .
+
+####################################################################################################
+## Final image
+####################################################################################################
+FROM alpine:latest
+
+# Import ca-certificates from builder
+COPY --from=builder /usr/share/ca-certificates /usr/share/ca-certificates
+COPY --from=builder /etc/ssl/certs /etc/ssl/certs
+
+# Copy our build
+COPY --from=builder /usr/local/cargo/bin/tafkars-lemmy /usr/local/bin/tafkars-lemmy
+
+# Use an unprivileged user.
+RUN adduser -c 'tafkars user' tafkars --home /nonexistent --no-create-home --disabled-password
+USER tafkars
+
+# Tell Docker to expose port 8000
+EXPOSE 8000
+
+# Run a healthcheck every minute to make sure tafkars-lemmy is functional
+HEALTHCHECK --interval=1m --timeout=3s CMD wget --spider --q http://localhost:8080/ || exit 1
+
+CMD ["tafkars-lemmy"]
