@@ -5,7 +5,7 @@ on:
     paths-ignore:
       - "**.md"
     branches:
-      - 'feat/github-docker-workflows'
+      - 'feat/github-docker-workflows' # testing
 
 jobs:
   build-docker:
@@ -37,6 +37,14 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=schedule
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha
 
       - name: Build and push
         id: docker_build
